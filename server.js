@@ -1924,3 +1924,48 @@ app.get("/test-email", async (req, res) => {
     });
   }
 });
+
+// Test endpoint to create a test appointment
+app.post("/api/test/create-appointment", requireFirebase, async (req, res) => {
+  console.log("🧪 Test: Creating test appointment...");
+
+  try {
+    // Create appointment 15 minutes from now
+    const appointmentTime = moment().add(15, "minutes");
+
+    const reminderData = {
+      appointmentDate: appointmentTime.format("YYYY-MM-DD"),
+      appointmentTime: appointmentTime.format("h:mm A"),
+      appointmentTimeUTC: appointmentTime.utc().toISOString(),
+      doctorTimezone: "America/New_York",
+      userTimezone: "America/New_York",
+      parentEmail: "test@example.com",
+      parentName: "Test Parent",
+      doctorName: "Test Doctor",
+      doctorEmail: "test.doctor@example.com",
+      meetingLink: "https://meet.example.com/test",
+      scheduledAt: new Date().toISOString(),
+      reminderSent: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      isTest: true,
+    };
+
+    // Store in Firestore
+    const reminderRef = await db.collection("ReminderEmails").add(reminderData);
+
+    console.log("✅ Test appointment created with ID:", reminderRef.id);
+
+    res.json({
+      success: true,
+      message: "Test appointment created",
+      reminderId: reminderRef.id,
+      reminderData,
+    });
+  } catch (error) {
+    console.error("❌ Error creating test appointment:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
