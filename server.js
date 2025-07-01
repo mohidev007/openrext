@@ -282,146 +282,15 @@ async function generateInvoicePDFPuppeteer({
     console.log("Chrome executable path:", await chromium.executablePath());
 
     // Create HTML template for the donation receipt
-    const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          margin: 0;
-          padding: 20px;
-          background-color: #f5f5f5;
-        }
-        .receipt-container {
-          background-color: white;
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 40px;
-          border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 30px;
-          border-bottom: 2px solid #002366;
-          padding-bottom: 20px;
-        }
-        .logo {
-          color: #002366;
-          font-size: 24px;
-          font-weight: bold;
-          margin-bottom: 10px;
-        }
-        .receipt-title {
-          color: #333;
-          font-size: 20px;
-          margin: 0;
-        }
-        .receipt-details {
-          margin: 30px 0;
-        }
-        .detail-row {
-          display: flex;
-          justify-content: space-between;
-          margin: 10px 0;
-          padding: 8px 0;
-          border-bottom: 1px solid #eee;
-        }
-        .detail-label {
-          font-weight: bold;
-          color: #555;
-        }
-        .detail-value {
-          color: #333;
-        }
-        .amount {
-          font-size: 18px;
-          font-weight: bold;
-          color: #007a2f;
-        }
-        .footer {
-          text-align: center;
-          margin-top: 30px;
-          padding-top: 20px;
-          border-top: 1px solid #eee;
-          color: #666;
-          font-size: 12px;
-        }
-        .tax-notice {
-          background-color: #f0f8ff;
-          padding: 15px;
-          border-radius: 5px;
-          margin: 20px 0;
-          font-size: 14px;
-          color: #555;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="receipt-container">
-        <div class="header">
-          <div class="logo">Rex Vets</div>
-          <h1 class="receipt-title">Donation Receipt</h1>
-        </div>
-        
-        <div class="receipt-details">
-          <div class="detail-row">
-            <span class="detail-label">Receipt Number:</span>
-            <span class="detail-value">${receiptNumber}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Donor Name:</span>
-            <span class="detail-value">${donorName}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Date:</span>
-            <span class="detail-value">${date}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Payment Method:</span>
-            <span class="detail-value">${paymentMethod}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Donation Type:</span>
-            <span class="detail-value">${
-              isRecurring ? "Recurring Monthly" : "One-time"
-            }</span>
-          </div>
-          ${
-            badgeName
-              ? `
-          <div class="detail-row">
-            <span class="detail-label">Badge Level:</span>
-            <span class="detail-value">${badgeName}</span>
-          </div>
-          `
-              : ""
-          }
-          <div class="detail-row">
-            <span class="detail-label">Donation Amount:</span>
-            <span class="detail-value amount">$${amount}</span>
-          </div>
-        </div>
-
-        <div class="tax-notice">
-          <strong>Tax Deduction Information:</strong><br>
-          Rex Vets is a 501(c)(3) nonprofit organization. Your donation is tax-deductible to the fullest extent allowed by law. 
-          Please consult your tax advisor for specific advice regarding your deduction.
-          <br><br>
-          <strong>EIN:</strong> [Tax ID Number]
-        </div>
-
-        <div class="footer">
-          <p>Thank you for supporting Rex Vets!</p>
-          <p>Email: support@rexvets.com | Website: www.rexvets.com</p>
-          <p>This receipt was generated on ${new Date().toLocaleString()}</p>
-        </div>
-      </div>
-    </body>
-    </html>
-    `;
+    const html = createDonationReceiptHTML({
+      donorName,
+      amount,
+      receiptNumber,
+      isRecurring,
+      badgeName,
+      date,
+      paymentMethod,
+    });
 
     // Configure Puppeteer for Railway environment
     const puppeteerConfig = {
@@ -491,6 +360,95 @@ async function generateInvoicePDFPuppeteer({
       }
     }
   }
+}
+
+// Donation receipt HTML template function
+function createDonationReceiptHTML({
+  donorName,
+  amount,
+  receiptNumber,
+  isRecurring,
+  badgeName,
+  date,
+  paymentMethod,
+}) {
+  const recurringText = isRecurring
+    ? "Your recurring monthly donation helps us provide ongoing support to animals in need."
+    : "Your one-time donation makes an immediate impact on the lives of animals in our care.";
+
+  return `
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<style>
+  body { margin: 0; padding: 20px; font-family: Arial, sans-serif; background-color: #f5f5f5; }
+  .invoice-container { max-width: 700px; margin: 0 auto; background: #ffffff; color: #333; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
+  .header { background-color: #002366; padding: 10px; text-align: center; }
+  .logo { width: 150px; height: auto; display: block; margin: 0 auto; }
+  .body { padding: 10px 30px; }
+  .title { color: #1e3a8a; font-size: 24px; margin: 20px 0 10px 0; }
+  .receipt-section { margin: 30px 0; border: 1px solid #d1d5db; border-radius: 8px; padding: 20px; background-color: #f9fafb; }
+  .receipt-title { margin-top: 0; color: #2563eb; font-size: 18px; }
+  .amount { color: #16a34a; font-weight: bold; }
+  .impact-title { color: #1e3a8a; margin-top: 30px; }
+  .impact-list { padding-left: 20px; color: #374151; }
+  .footer { background: rgb(200, 206, 219); padding: 15px; font-size: 13px; color: rgb(38, 79, 160); text-align: center; }
+  .footer p { margin: 4px 0; }
+  .footer a { color: rgb(16, 45, 143); }
+  p { line-height: 1.5; }
+  strong { font-weight: bold; }
+</style></head>
+<body>
+  <div class="invoice-container">
+    <!-- Header -->
+    <div class="header">
+      <img class="logo" src="https://res.cloudinary.com/di6zff0rd/image/upload/v1747926532/Logo_debjuj.png" alt="Rex Vets Logo">
+    </div>
+
+    <!-- Body -->
+    <div class="body">
+      <h2 class="title">Thank You for Your Generous Donation!</h2>
+      <p>Dear <strong>${donorName}</strong>,</p>
+      <p>We sincerely appreciate your contribution to RexVets. ${recurringText}</p>
+
+      <div class="receipt-section">
+        <h3 class="receipt-title">Donation Receipt</h3>
+        <p><strong>Receipt No:</strong> ${receiptNumber}</p>
+        <p><strong>Date:</strong> ${date}</p>
+        <p><strong>Donation Amount:</strong> <span class="amount">$${amount}</span></p>
+        ${
+          badgeName
+            ? `<p><strong>Badge:</strong> <strong>${badgeName}</strong></p>`
+            : ""
+        }
+        <p><strong>Payment Method:</strong> ${paymentMethod}</p>
+        <h4>Tax Statement:</h4>
+        <p style="margin:0">Rex Vets Inc is a 501(c)(3) non-profit organization. No goods or services were received in exchange for this gift. It may be considered tax-deductible to the full extent of the law. Please retain this receipt for your records.</p>
+      </div>
+
+      <h4 class="impact-title">A Note of Thanks:</h4>
+     
+      <ul class="impact-list">
+        <li>Your donation directly supports animals in need by helping us provide free and low-cost virtual veterinary care to pets in underserved communities.</li>
+        <li>Every dollar helps us reach more families and save more lives — from emergency consultations to routine care.</li>
+        <li>With your support, we're one step closer to making quality vet care accessible for every pet, regardless of circumstance.</li>
+      </ul>
+
+      <p>If you have any questions, feel free to reach out to us at support@rexvets.com.</p>
+      
+      <p style="margin-top: 20px;">With heartfelt thanks,</p>
+      <p><em>– The RexVets Team</em></p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>Rex Vets Inc</p>
+      <p>📍 123 Animal Care Drive, Miami, FL 33101</p>
+      <p>EIN: (123) 456-7690 | ✉️ support@rexvets.com</p>
+      <p>🌐 www.rexvets.com</p>
+    </div>
+  </div>
+</body></html>
+  `;
 }
 
 // EMAILS
