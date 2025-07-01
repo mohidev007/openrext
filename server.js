@@ -27,6 +27,15 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Log startup environment
+console.log("🔧 Starting server with configuration:");
+console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
+console.log(`- PORT: ${PORT}`);
+console.log(
+  `- Firebase Project: ${process.env.FIREBASE_PROJECT_ID || "Not configured"}`
+);
+console.log(`- SMTP Host: ${process.env.SMTP_HOST || "Not configured"}`);
+
 // Configure CORS based on environment
 const corsOptions = {
   origin: process.env.ALLOWED_ORIGIN || "https://www.rexvets.com",
@@ -34,6 +43,27 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   credentials: true,
 };
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error("❌ Unhandled error:", err);
+  res.status(500).json({
+    status: "error",
+    message: "Internal server error",
+    error: process.env.NODE_ENV === "development" ? err.message : undefined,
+  });
+});
+
+// Timeout middleware - ensure requests don't hang
+app.use((req, res, next) => {
+  res.setTimeout(30000, () => {
+    res.status(503).json({
+      status: "error",
+      message: "Request timeout",
+    });
+  });
+  next();
+});
 
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -195,95 +225,24 @@ async function generateInvoicePDFPuppeteer({
   date,
   paymentMethod,
 }) {
-  const recurringText = isRecurring
-    ? "Your recurring monthly donation will help us provide continuous care to pets in need."
-    : "Your one-time donation makes an immediate impact on the lives of pets and their families.";
-
-  const html = `<!DOCTYPE html>
-    <html><head><meta charset="utf-8"/>
-    <style>
-      body { margin: 0; padding: 20px; font-family: Arial, sans-serif; background-color: #f5f5f5; }
-      .invoice-container { max-width: 700px; margin: 0 auto; background: #ffffff; color: #333; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
-      .header { background-color: #002366; padding: 10px; text-align: center; }
-      .logo { width: 150px; height: auto; display: block; margin: 0 auto; }
-      .body { padding: 10px 30px; }
-      .title { color: #1e3a8a; font-size: 24px; margin: 20px 0 10px 0; }
-      .receipt-section { margin: 30px 0; border: 1px solid #d1d5db; border-radius: 8px; padding: 20px; background-color: #f9fafb; }
-      .receipt-title { margin-top: 0; color: #2563eb; font-size: 18px; }
-      .amount { color: #16a34a; font-weight: bold; }
-      .impact-title { color: #1e3a8a; margin-top: 30px; }
-      .impact-list { padding-left: 20px; color: #374151; }
-      .footer { background: rgb(200, 206, 219); padding: 15px; font-size: 13px; color: rgb(38, 79, 160); text-align: center; }
-      .footer p { margin: 4px 0; }
-      .footer a { color: rgb(16, 45, 143); }
-      p { line-height: 1.5; }
-      strong { font-weight: bold; }
-    </style></head>
-    <body>
-      <div class="invoice-container">
-        <!-- Header -->
-        <div class="header">
-          <img class="logo" src="https://res.cloudinary.com/di6zff0rd/image/upload/v1747926532/Logo_debjuj.png" alt="Rex Vets Logo">
-        </div>
-
-        <!-- Body -->
-        <div class="body">
-          <h2 class="title">Thank You for Your Generous Donation!</h2>
-          <p>Dear <strong>${donorName}</strong>,</p>
-          <p>We sincerely appreciate your contribution to RexVets. ${recurringText}</p>
-
-          <div class="receipt-section">
-            <h3 class="receipt-title">Donation Receipt</h3>
-            <p><strong>Receipt No:</strong> ${receiptNumber}</p>
-            <p><strong>Date:</strong> ${date}</p>
-            <p><strong>Donation Amount:</strong> <span class="amount">$${amount}</span></p>
-            <p><strong>Badge:</strong> <strong>${badgeName}</strong></p>
-            <p><strong>Payment Method:</strong> ${paymentMethod}</p>
-            <h4>Tax Statement:</h4>
-      <p style="margin:0">Rex Vets Inc is a 501(c)(3) non-profit organization. No goods or services were received in exchange for this gift. It may be considered tax-deductible to the full extent of the law. Please retain this receipt for your records.</p>
-          </div>
-
-          <h4 class="impact-title">A Note of Thanks:</h4>
-         
-          <ul class="impact-list">
-            <li>Your donation directly supports animals in need by helping us provide free and low-cost virtual veterinary care to pets in underserved communities.</li>
-            <li>Every dollar helps us reach more families and save more lives — from emergency consultations to routine care.</li>
-            <li>With your support, we're one step closer to making quality vet care accessible for every pet, regardless of circumstance.</li>
-          </ul>
-
-          <p>If you have any questions, feel free to reach out to us at support@rexvets.com.</p>
-          
-          <p style="margin-top: 20px;">With heartfelt thanks,</p>
-          <p><em>– The RexVets Team</em></p>
-        </div>
-
-        <!-- Footer -->
-        <div class="footer">
-          <p>Rex Vets Inc</p>
-          <p>📍 123 Animal Care Drive, Miami, FL 33101</p>
-          <p>EIN: (123) 456-7690 | ✉️ support@rexvets.com</p>
-          <p>🌐 www.rexvets.com</p>
-        </div>
-      </div>
-    </body></html>`;
-
   let browser = null;
   try {
-    console.log("Environment check - VERCEL:", !!process.env.VERCEL);
+    console.log("🔄 Starting PDF generation...");
+    console.log("Environment:", process.env.NODE_ENV);
     console.log("Chrome executable path:", await chromium.executablePath());
-    console.log("Chrome args:", chromium.args);
-    console.log("Launching Puppeteer with @sparticuz/chromium...");
 
-    // Always use @sparticuz/chromium in production (Vercel)
-    browser = await puppeteer.launch({
+    // Configure Puppeteer for Railway environment
+    const puppeteerConfig = {
       args: [
         ...chromium.args,
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
-        "--hide-scrollbars",
-        "--disable-web-security",
+        "--no-first-run",
+        "--no-zygote",
+        "--single-process",
+        "--disable-extensions",
       ],
       defaultViewport: {
         width: 800,
@@ -293,28 +252,39 @@ async function generateInvoicePDFPuppeteer({
       executablePath: await chromium.executablePath(),
       headless: true,
       ignoreHTTPSErrors: true,
-    });
+    };
 
-    console.log("Browser launched successfully");
+    console.log(
+      "Launching browser with config:",
+      JSON.stringify(puppeteerConfig, null, 2)
+    );
+    browser = await puppeteer.launch(puppeteerConfig);
+
+    console.log("✅ Browser launched successfully");
     const page = await browser.newPage();
-    console.log("Page created");
+    console.log("✅ New page created");
+
+    // Set a reasonable timeout for page operations
+    page.setDefaultTimeout(15000);
+    page.setDefaultNavigationTimeout(15000);
 
     await page.setContent(html, {
-      waitUntil: "networkidle0",
-      timeout: 30000,
+      waitUntil: ["load", "networkidle0"],
+      timeout: 15000,
     });
-    console.log("Content set");
+    console.log("✅ Content set successfully");
 
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: { top: 20, right: 20, bottom: 20, left: 20 },
+      timeout: 15000,
     });
-    console.log("PDF generated successfully");
+    console.log("✅ PDF generated successfully");
 
     return pdfBuffer;
   } catch (err) {
-    console.error("Puppeteer error details:", {
+    console.error("❌ PDF generation error:", {
       message: err.message,
       stack: err.stack,
       name: err.name,
@@ -324,9 +294,9 @@ async function generateInvoicePDFPuppeteer({
     if (browser) {
       try {
         await browser.close();
-        console.log("Browser closed successfully");
+        console.log("✅ Browser closed successfully");
       } catch (closeErr) {
-        console.error("Error closing browser:", closeErr.message);
+        console.error("❌ Error closing browser:", closeErr.message);
       }
     }
   }
@@ -335,28 +305,38 @@ async function generateInvoicePDFPuppeteer({
 // EMAILS
 
 // Enhanced health check endpoint for Railway
-app.get("/", (req, res) => {
-  const firebaseStatus =
-    admin.apps.length > 0 ? "Connected" : "Not initialized";
-  const dbStatus = db ? "Connected" : "Not connected";
+app.get(["/", "/health"], (req, res) => {
+  try {
+    const firebaseStatus =
+      admin.apps.length > 0 ? "Connected" : "Not initialized";
+    const dbStatus = db ? "Connected" : "Not connected";
 
-  res.json({
-    status: "OK",
-    message: "Rex Vets Email Server is running",
-    timestamp: new Date().toISOString(),
-    platform: "Railway",
-    services: {
-      firebase: firebaseStatus,
-      firestore: dbStatus,
-      nodemailer: "Ready",
-    },
-    environment: {
-      hasFirebaseConfig: !!process.env.FIREBASE_PROJECT_ID,
-      hasSMTPConfig: !!process.env.SMTP_HOST,
-      nodeVersion: process.version,
-      platform: process.platform,
-    },
-  });
+    res.json({
+      status: "OK",
+      message: "Rex Vets Email Server is running",
+      timestamp: new Date().toISOString(),
+      platform: "Railway",
+      services: {
+        firebase: firebaseStatus,
+        firestore: dbStatus,
+        nodemailer: "Ready",
+      },
+      environment: {
+        hasFirebaseConfig: !!process.env.FIREBASE_PROJECT_ID,
+        hasSMTPConfig: !!process.env.SMTP_HOST,
+        nodeVersion: process.version,
+        platform: process.platform,
+        port: PORT,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Health check error:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Health check failed",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
 });
 
 app.post("/sendWelcomeEmailParent", (req, res) => {
@@ -1129,10 +1109,24 @@ async function trackMessagesForAllAppointments() {
 
 // trackAllAppointments();
 // Iniciar el servidor - Disabled for serverless deployment
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`🔒 CORS origin: ${corsOptions.origin}`);
+const server = app
+  .listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
+    console.log(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
+    console.log(`🔒 CORS origin: ${corsOptions.origin}`);
+  })
+  .on("error", (error) => {
+    console.error("❌ Failed to start server:", error);
+    process.exit(1);
+  });
+
+// Handle graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("🛑 SIGTERM received. Shutting down gracefully...");
+  server.close(() => {
+    console.log("✅ Server closed");
+    process.exit(0);
+  });
 });
 
 // UPDATED Cron job endpoint for processing reminder emails with timezone support
@@ -1546,9 +1540,4 @@ app.get("/debug/env", (req, res) => {
     firebaseApps: admin.apps.length,
     firestoreStatus: db ? "initialized" : "not initialized",
   });
-});
-
-// Health check endpoint for Railway
-app.get("/health", (req, res) => {
-  res.send("OK");
 });
