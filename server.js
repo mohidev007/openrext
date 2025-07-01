@@ -337,7 +337,7 @@ async function generateInvoicePDFPuppeteer({
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
-      margin: { top: 20, right: 20, bottom: 20, left: 20 },
+      margin: { top: 10, right: 10, bottom: 10, left: 10 },
       timeout: 20000,
     });
     console.log("✅ PDF generated successfully");
