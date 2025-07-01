@@ -1433,116 +1433,59 @@ app.get("/api/cron/process-reminders", requireFirebase, async (req, res) => {
   }
 });
 
-// // Manual trigger endpoint for immediate testing (same as cron but can be called anytime)
-// app.post("/api/manual/process-reminders", requireFirebase, async (req, res) => {
-//   console.log("🔧 Manual trigger: Processing reminder emails...");
+// Test endpoint to manually trigger a reminder
+app.post("/api/test/trigger-reminder", requireFirebase, async (req, res) => {
+  console.log("🧪 Test: Manually triggering a reminder...");
 
-//   try {
-//     const now = moment.utc(); // Use UTC for calculations
-//     console.log(
-//       `⏰ Current UTC time: ${now.format("YYYY-MM-DD HH:mm:ss")} UTC`
-//     );
+  try {
+    const { reminderId } = req.body;
 
-//     // Query for unsent reminders
-//     const remindersSnapshot = await db
-//       .collection("ReminderEmails")
-//       .where("reminderSent", "==", false)
-//       .get();
+    if (!reminderId) {
+      return res.status(400).json({
+        success: false,
+        error: "reminderId is required",
+      });
+    }
 
-//     console.log(`📧 Found ${remindersSnapshot.size} pending reminders`);
+    // Get the reminder
+    const reminderDoc = await db
+      .collection("ReminderEmails")
+      .doc(reminderId)
+      .get();
 
-//     let processedCount = 0;
-//     let sentCount = 0;
+    if (!reminderDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: "Reminder not found",
+      });
+    }
 
-//     for (const doc of remindersSnapshot.docs) {
-//       const reminderData = doc.data();
-//       processedCount++;
+    const reminderData = reminderDoc.data();
+    console.log("📧 Attempting to send reminder for:", reminderData);
 
-//       let shouldSend = false;
-//       let appointmentUTC;
+    // Send the reminder
+    await sendReminderEmails(reminderData);
 
-//       // Use AppointmentTimeUTC if available (new format)
-//       if (reminderData.appointmentTimeUTC) {
-//         appointmentUTC = moment.utc(reminderData.appointmentTimeUTC);
-//       } else {
-//         // Fallback to old format - assume doctor's timezone or EST
-//         const timezone = reminderData.doctorTimezone || "America/New_York";
-//         appointmentUTC = moment
-//           .tz(
-//             `${reminderData.appointmentDate} ${reminderData.appointmentTime}`,
-//             "YYYY-MM-DD h:mm A",
-//             timezone
-//           )
-//           .utc();
-//       }
+    // Mark as sent
+    await reminderDoc.ref.update({
+      reminderSent: true,
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      testSend: true,
+    });
 
-//       // Send reminder 10 minutes before appointment
-//       const reminderTimeUTC = appointmentUTC.clone().subtract(10, "minutes");
-//       shouldSend = now.isAfter(reminderTimeUTC) && now.isBefore(appointmentUTC);
-
-//       console.log(
-//         `📅 Processing reminder for ${
-//           reminderData.parentEmail
-//         }: appointment at ${appointmentUTC.format(
-//           "YYYY-MM-DD HH:mm:ss"
-//         )} UTC, reminder time: ${reminderTimeUTC.format(
-//           "YYYY-MM-DD HH:mm:ss"
-//         )} UTC, should send: ${shouldSend}`
-//       );
-
-//       if (shouldSend) {
-//         console.log(
-//           `✅ Sending 10-minute reminder to ${reminderData.parentEmail} and ${reminderData.doctorEmail}...`
-//         );
-
-//         try {
-//           await sendReminderEmails(reminderData);
-
-//           // Mark as sent
-//           await doc.ref.update({
-//             reminderSent: true,
-//             sentAt: admin.firestore.FieldValue.serverTimestamp(),
-//           });
-
-//           sentCount++;
-//           console.log(
-//             `🎉 Reminder emails sent successfully to both ${reminderData.parentEmail} and ${reminderData.doctorEmail}`
-//           );
-//         } catch (emailError) {
-//           console.error(
-//             `❌ Error sending reminder emails for appointment with ${reminderData.parentEmail}:`,
-//             emailError
-//           );
-//           await doc.ref.update({
-//             reminderSent: false,
-//             lastError: emailError.message,
-//             lastAttempt: admin.firestore.FieldValue.serverTimestamp(),
-//           });
-//         }
-//       }
-//     }
-
-//     console.log(
-//       `✅ Manual trigger completed: Processed ${processedCount} reminders, sent ${sentCount} emails`
-//     );
-//     res.json({
-//       success: true,
-//       message: `Manual trigger: Processed ${processedCount} reminders, sent ${sentCount} emails`,
-//       processedCount,
-//       sentCount,
-//       timestamp: now.toISOString(),
-//       trigger: "manual",
-//     });
-//   } catch (error) {
-//     console.error("❌ Error in manual trigger:", error);
-//     res.status(500).json({
-//       success: false,
-//       error: error.message,
-//       timestamp: new Date().toISOString(),
-//       trigger: "manual",
-//     });
-//   }
-// });
+    res.json({
+      success: true,
+      message: "Test reminder sent successfully",
+      reminderData,
+    });
+  } catch (error) {
+    console.error("❌ Error in test endpoint:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
 
 // Debug endpoint to check pending reminders
 app.get("/api/debug/reminders", requireFirebase, async (req, res) => {
