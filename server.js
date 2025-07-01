@@ -1475,7 +1475,7 @@ app.get("/api/debug/reminders", requireFirebase, async (req, res) => {
   }
 });
 
-// Route to send donation thank you emails
+// Route to send donation thank you emails - TEMPORARILY WITHOUT PDF
 app.post("/sendDonationThankYou", async (req, res) => {
   console.log("📧 Received donation thank you request:", req.body);
 
@@ -1492,30 +1492,20 @@ app.post("/sendDonationThankYou", async (req, res) => {
     taxDeductibleAmount,
   } = req.body;
 
+  // Input validation
+  if (!email || !name || !donationAmount) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing required fields: email, name, or donationAmount",
+    });
+  }
+
   const receiptNumber = transactionID || `REX_${Date.now()}`;
 
   try {
-    console.log("🔄 Starting PDF generation...");
-    const pdfPromise = generateInvoicePDFPuppeteer({
-      donorName: name,
-      amount: donationAmount,
-      receiptNumber: transactionID,
-      isRecurring,
-      badgeName,
-      date: donationDate,
-      paymentMethod,
-    });
+    console.log("📧 Sending donation thank you email...");
 
-    // Set a timeout for PDF generation
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("PDF generation timeout")), 45000)
-    );
-
-    // Race between PDF generation and timeout
-    const pdfBuffer = await Promise.race([pdfPromise, timeoutPromise]);
-    console.log("✅ PDF generated successfully");
-
-    // Send email with PDF
+    // Send email WITHOUT PDF for now (to avoid Puppeteer issues)
     const mailOptions = {
       from: "Rex Vets <support@rexvets.com>",
       to: email,
@@ -1529,13 +1519,14 @@ app.post("/sendDonationThankYou", async (req, res) => {
         donationDate,
         paymentMethod
       ),
-      attachments: [
-        {
-          filename: "Donation_Receipt.pdf",
-          content: pdfBuffer,
-          contentType: "application/pdf",
-        },
-      ],
+      // Temporarily removed PDF attachment to avoid server crashes
+      // attachments: [
+      //   {
+      //     filename: "Donation_Receipt.pdf",
+      //     content: pdfBuffer,
+      //     contentType: "application/pdf",
+      //   },
+      // ],
     };
 
     // Send email with Promise
@@ -1545,7 +1536,7 @@ app.post("/sendDonationThankYou", async (req, res) => {
           console.error("❌ Error sending email:", error);
           reject(error);
         } else {
-          console.log("✅ Email with PDF sent successfully:", info.response);
+          console.log("✅ Email sent successfully:", info.response);
           resolve(info);
         }
       });
@@ -1553,26 +1544,18 @@ app.post("/sendDonationThankYou", async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Donation thank you email with receipt sent successfully!",
+      message:
+        "Donation thank you email sent successfully! PDF receipt will be sent separately.",
     });
-  } catch (error) {
-    console.error("❌ Error processing donation:", error);
 
-    // Send error notification to user
-    try {
-      await transporter.sendMail({
-        from: "Rex Vets <support@rexvets.com>",
-        to: email,
-        subject: "About Your Donation Receipt - Rex Vets",
-        html: `<p>Dear ${name},</p><p>We encountered an issue generating your receipt. Our team has been notified and will send it to you shortly.</p><p>Thank you for your patience!</p>`,
-      });
-    } catch (emailError) {
-      console.error("❌ Failed to send error notification:", emailError);
-    }
+    console.log("✅ Donation email sent successfully to:", email);
+  } catch (error) {
+    console.error("❌ Error processing donation email:", error);
 
     res.status(500).json({
       success: false,
-      message: "Failed to process donation receipt. We'll send it separately.",
+      message: "Failed to send donation email. Please try again.",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
@@ -1610,4 +1593,34 @@ app.get("/debug/env", (req, res) => {
     firebaseApps: admin.apps.length,
     firestoreStatus: db ? "initialized" : "not initialized",
   });
+});
+
+// Simple test endpoint for donation functionality
+app.post("/test-donation", (req, res) => {
+  console.log("🧪 Test donation endpoint called");
+  console.log("🧪 Request body:", req.body);
+  console.log("🧪 Request headers:", req.headers);
+  console.log("🧪 Request origin:", req.headers.origin);
+
+  try {
+    res.status(200).json({
+      success: true,
+      message: "Test donation endpoint working!",
+      receivedData: {
+        hasBody: !!req.body,
+        bodyKeys: req.body ? Object.keys(req.body) : [],
+        contentType: req.headers["content-type"],
+        origin: req.headers.origin,
+        userAgent: req.headers["user-agent"]?.substring(0, 50) + "...",
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error in test-donation endpoint:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
