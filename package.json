@@ -1,5 +1,10 @@
 {
+  "name": "rexvets-email-server",
+  "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@sparticuz/chromium": "^121.0.0",
     "cors": "^2.8.5",
@@ -22,6 +27,6 @@
   },
   "scripts": {
     "start": "node server.js",
-    "build": "echo 'No build step required'"
+    "dev": "nodemon server.js"
   }
 }
