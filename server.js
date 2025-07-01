@@ -1301,6 +1301,16 @@ process.on("SIGTERM", () => {
 // UPDATED Cron job endpoint for processing reminder emails with timezone support
 app.get("/api/cron/process-reminders", requireFirebase, async (req, res) => {
   console.log("🔄 Cron job triggered: Processing reminder emails...");
+  console.log("🔍 Request headers:", {
+    "user-agent": req.headers["user-agent"],
+    "x-forwarded-for": req.headers["x-forwarded-for"],
+    "railway-cron": req.headers["railway-cron"],
+  });
+  console.log("🔍 Request headers:", {
+    "user-agent": req.headers["user-agent"],
+    "x-forwarded-for": req.headers["x-forwarded-for"],
+    "railway-cron": req.headers["railway-cron"],
+  });
 
   try {
     const now = moment.utc(); // Use UTC for calculations
@@ -1390,21 +1400,41 @@ app.get("/api/cron/process-reminders", requireFirebase, async (req, res) => {
     console.log(
       `✅ Cron job completed: Processed ${processedCount} reminders, sent ${sentCount} emails`
     );
-    res.json({
+
+    const response = {
       success: true,
       message: `Processed ${processedCount} reminders, sent ${sentCount} emails`,
       processedCount,
       sentCount,
       timestamp: now.toISOString(),
-    });
+      serverTime: now.format("YYYY-MM-DD HH:mm:ss") + " UTC",
+      platform: "Railway",
+    };
+
+    res.json(response);
   } catch (error) {
     console.error("❌ Error in cron job:", error);
-    res.status(500).json({
+    const errorResponse = {
       success: false,
       error: error.message,
       timestamp: new Date().toISOString(),
-    });
+      platform: "Railway",
+    };
+    res.status(500).json(errorResponse);
   }
+});
+
+// Heartbeat endpoint for monitoring
+app.get("/api/heartbeat", (req, res) => {
+  const now = moment.utc();
+  res.json({
+    status: "alive",
+    timestamp: now.toISOString(),
+    serverTime: now.format("YYYY-MM-DD HH:mm:ss") + " UTC",
+    platform: "Railway",
+    uptime: process.uptime(),
+    message: "Server is running and healthy",
+  });
 });
 
 // Manual trigger endpoint for immediate testing (same as cron but can be called anytime)
@@ -1570,6 +1600,87 @@ app.get("/api/debug/reminders", requireFirebase, async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
+    });
+  }
+});
+
+// Heartbeat endpoint for monitoring
+app.get("/api/heartbeat", (req, res) => {
+  const now = moment.utc();
+  res.json({
+    status: "alive",
+    timestamp: now.toISOString(),
+    serverTime: now.format("YYYY-MM-DD HH:mm:ss") + " UTC",
+    platform: "Railway",
+    uptime: process.uptime(),
+    message: "Server is running and healthy",
+  });
+});
+
+// Enhanced cron status endpoint
+app.get("/api/cron/status", requireFirebase, async (req, res) => {
+  try {
+    const now = moment.utc();
+
+    // Get recent reminders
+    const remindersSnapshot = await db
+      .collection("ReminderEmails")
+      .where("reminderSent", "==", false)
+      .limit(10)
+      .get();
+
+    const recentSentSnapshot = await db
+      .collection("ReminderEmails")
+      .where("reminderSent", "==", true)
+      .orderBy("sentAt", "desc")
+      .limit(5)
+      .get();
+
+    const pendingReminders = [];
+    const sentReminders = [];
+
+    remindersSnapshot.forEach((doc) => {
+      const data = doc.data();
+      pendingReminders.push({
+        id: doc.id,
+        parentEmail: data.parentEmail,
+        appointmentDate: data.appointmentDate,
+        appointmentTime: data.appointmentTime,
+        createdAt:
+          data.createdAt?.toDate?.()?.toISOString() || data.scheduledAt,
+      });
+    });
+
+    recentSentSnapshot.forEach((doc) => {
+      const data = doc.data();
+      sentReminders.push({
+        id: doc.id,
+        parentEmail: data.parentEmail,
+        appointmentDate: data.appointmentDate,
+        appointmentTime: data.appointmentTime,
+        sentAt: data.sentAt?.toDate?.()?.toISOString() || "Unknown",
+      });
+    });
+
+    res.json({
+      status: "healthy",
+      currentTime: now.format("YYYY-MM-DD HH:mm:ss") + " UTC",
+      platform: "Railway",
+      cronJobStatus: {
+        endpoint: "/api/cron/process-reminders",
+        lastCheck: now.toISOString(),
+        pendingRemindersCount: pendingReminders.length,
+        recentSentCount: sentReminders.length,
+      },
+      pendingReminders,
+      recentSentReminders: sentReminders,
+    });
+  } catch (error) {
+    console.error("❌ Error in cron status endpoint:", error);
+    res.status(500).json({
+      status: "error",
+      error: error.message,
+      timestamp: new Date().toISOString(),
     });
   }
 });
