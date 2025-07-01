@@ -1,0 +1,8 @@
+# Railway Cron Configuration for Rex Vets Email Server
+# This file defines the cron jobs for reminder email processing
+
+# Send appointment reminder emails every 2 minutes
+*/2 * * * * curl -X GET "https://web-production-aa439.up.railway.app/api/cron/process-reminders"
+
+# Optional: Health check every hour
+0 * * * * curl -X GET "https://web-production-aa439.up.railway.app/health" 
