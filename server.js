@@ -27,8 +27,16 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors()); // Enable CORS for all routes
-app.use(express.json()); // Middleware to parse JSON bodies
+// Configure CORS based on environment
+const corsOptions = {
+  origin: process.env.ALLOWED_ORIGIN || "https://www.rexvets.com",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.use(express.json());
 
 // Global error handlers to prevent function crashes
 process.on("unhandledRejection", (reason, promise) => {
@@ -240,7 +248,7 @@ async function generateInvoicePDFPuppeteer({
           <ul class="impact-list">
             <li>Your donation directly supports animals in need by helping us provide free and low-cost virtual veterinary care to pets in underserved communities.</li>
             <li>Every dollar helps us reach more families and save more lives — from emergency consultations to routine care.</li>
-            <li>With your support, we’re one step closer to making quality vet care accessible for every pet, regardless of circumstance.</li>
+            <li>With your support, we're one step closer to making quality vet care accessible for every pet, regardless of circumstance.</li>
           </ul>
 
           <p>If you have any questions, feel free to reach out to us at support@rexvets.com.</p>
@@ -326,7 +334,7 @@ async function generateInvoicePDFPuppeteer({
 
 // EMAILS
 
-// Health check endpoint
+// Enhanced health check endpoint for Railway
 app.get("/", (req, res) => {
   const firebaseStatus =
     admin.apps.length > 0 ? "Connected" : "Not initialized";
@@ -336,6 +344,7 @@ app.get("/", (req, res) => {
     status: "OK",
     message: "Rex Vets Email Server is running",
     timestamp: new Date().toISOString(),
+    platform: "Railway",
     services: {
       firebase: firebaseStatus,
       firestore: dbStatus,
@@ -344,6 +353,8 @@ app.get("/", (req, res) => {
     environment: {
       hasFirebaseConfig: !!process.env.FIREBASE_PROJECT_ID,
       hasSMTPConfig: !!process.env.SMTP_HOST,
+      nodeVersion: process.version,
+      platform: process.platform,
     },
   });
 });
@@ -1118,13 +1129,11 @@ async function trackMessagesForAllAppointments() {
 
 // trackAllAppointments();
 // Iniciar el servidor - Disabled for serverless deployment
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log("Email server started and ready.");
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`🔒 CORS origin: ${corsOptions.origin}`);
 });
-
-// Export the app for Vercel serverless deployment
-export default app;
 
 // UPDATED Cron job endpoint for processing reminder emails with timezone support
 app.get("/api/cron/process-reminders", requireFirebase, async (req, res) => {
@@ -1537,4 +1546,9 @@ app.get("/debug/env", (req, res) => {
     firebaseApps: admin.apps.length,
     firestoreStatus: db ? "initialized" : "not initialized",
   });
+});
+
+// Health check endpoint for Railway
+app.get("/health", (req, res) => {
+  res.send("OK");
 });
