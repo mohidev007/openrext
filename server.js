@@ -281,6 +281,148 @@ async function generateInvoicePDFPuppeteer({
     console.log("Environment:", process.env.NODE_ENV);
     console.log("Chrome executable path:", await chromium.executablePath());
 
+    // Create HTML template for the donation receipt
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 20px;
+          background-color: #f5f5f5;
+        }
+        .receipt-container {
+          background-color: white;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 40px;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+          border-bottom: 2px solid #002366;
+          padding-bottom: 20px;
+        }
+        .logo {
+          color: #002366;
+          font-size: 24px;
+          font-weight: bold;
+          margin-bottom: 10px;
+        }
+        .receipt-title {
+          color: #333;
+          font-size: 20px;
+          margin: 0;
+        }
+        .receipt-details {
+          margin: 30px 0;
+        }
+        .detail-row {
+          display: flex;
+          justify-content: space-between;
+          margin: 10px 0;
+          padding: 8px 0;
+          border-bottom: 1px solid #eee;
+        }
+        .detail-label {
+          font-weight: bold;
+          color: #555;
+        }
+        .detail-value {
+          color: #333;
+        }
+        .amount {
+          font-size: 18px;
+          font-weight: bold;
+          color: #007a2f;
+        }
+        .footer {
+          text-align: center;
+          margin-top: 30px;
+          padding-top: 20px;
+          border-top: 1px solid #eee;
+          color: #666;
+          font-size: 12px;
+        }
+        .tax-notice {
+          background-color: #f0f8ff;
+          padding: 15px;
+          border-radius: 5px;
+          margin: 20px 0;
+          font-size: 14px;
+          color: #555;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="receipt-container">
+        <div class="header">
+          <div class="logo">Rex Vets</div>
+          <h1 class="receipt-title">Donation Receipt</h1>
+        </div>
+        
+        <div class="receipt-details">
+          <div class="detail-row">
+            <span class="detail-label">Receipt Number:</span>
+            <span class="detail-value">${receiptNumber}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Donor Name:</span>
+            <span class="detail-value">${donorName}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Date:</span>
+            <span class="detail-value">${date}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Payment Method:</span>
+            <span class="detail-value">${paymentMethod}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Donation Type:</span>
+            <span class="detail-value">${
+              isRecurring ? "Recurring Monthly" : "One-time"
+            }</span>
+          </div>
+          ${
+            badgeName
+              ? `
+          <div class="detail-row">
+            <span class="detail-label">Badge Level:</span>
+            <span class="detail-value">${badgeName}</span>
+          </div>
+          `
+              : ""
+          }
+          <div class="detail-row">
+            <span class="detail-label">Donation Amount:</span>
+            <span class="detail-value amount">$${amount}</span>
+          </div>
+        </div>
+
+        <div class="tax-notice">
+          <strong>Tax Deduction Information:</strong><br>
+          Rex Vets is a 501(c)(3) nonprofit organization. Your donation is tax-deductible to the fullest extent allowed by law. 
+          Please consult your tax advisor for specific advice regarding your deduction.
+          <br><br>
+          <strong>EIN:</strong> [Tax ID Number]
+        </div>
+
+        <div class="footer">
+          <p>Thank you for supporting Rex Vets!</p>
+          <p>Email: support@rexvets.com | Website: www.rexvets.com</p>
+          <p>This receipt was generated on ${new Date().toLocaleString()}</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    `;
+
     // Configure Puppeteer for Railway environment
     const puppeteerConfig = {
       args: [
@@ -293,6 +435,8 @@ async function generateInvoicePDFPuppeteer({
         "--no-zygote",
         "--single-process",
         "--disable-extensions",
+        "--disable-web-security",
+        "--disable-features=VizDisplayCompositor",
       ],
       defaultViewport: {
         width: 800,
@@ -304,10 +448,7 @@ async function generateInvoicePDFPuppeteer({
       ignoreHTTPSErrors: true,
     };
 
-    console.log(
-      "Launching browser with config:",
-      JSON.stringify(puppeteerConfig, null, 2)
-    );
+    console.log("Launching browser with config...");
     browser = await puppeteer.launch(puppeteerConfig);
 
     console.log("✅ Browser launched successfully");
@@ -315,12 +456,12 @@ async function generateInvoicePDFPuppeteer({
     console.log("✅ New page created");
 
     // Set a reasonable timeout for page operations
-    page.setDefaultTimeout(15000);
-    page.setDefaultNavigationTimeout(15000);
+    page.setDefaultTimeout(20000);
+    page.setDefaultNavigationTimeout(20000);
 
     await page.setContent(html, {
       waitUntil: ["load", "networkidle0"],
-      timeout: 15000,
+      timeout: 20000,
     });
     console.log("✅ Content set successfully");
 
@@ -328,7 +469,7 @@ async function generateInvoicePDFPuppeteer({
       format: "A4",
       printBackground: true,
       margin: { top: 20, right: 20, bottom: 20, left: 20 },
-      timeout: 15000,
+      timeout: 20000,
     });
     console.log("✅ PDF generated successfully");
 
@@ -1475,7 +1616,7 @@ app.get("/api/debug/reminders", requireFirebase, async (req, res) => {
   }
 });
 
-// Route to send donation thank you emails - TEMPORARILY WITHOUT PDF
+// Route to send donation thank you emails - WITH FIXED PDF GENERATION
 app.post("/sendDonationThankYou", async (req, res) => {
   console.log("📧 Received donation thank you request:", req.body);
 
@@ -1503,9 +1644,38 @@ app.post("/sendDonationThankYou", async (req, res) => {
   const receiptNumber = transactionID || `REX_${Date.now()}`;
 
   try {
+    console.log("🔄 Starting PDF generation...");
+
+    // Generate PDF with proper error handling
+    let pdfBuffer = null;
+    try {
+      const pdfPromise = generateInvoicePDFPuppeteer({
+        donorName: name,
+        amount: donationAmount,
+        receiptNumber: transactionID,
+        isRecurring,
+        badgeName,
+        date: donationDate,
+        paymentMethod,
+      });
+
+      // Set a timeout for PDF generation
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("PDF generation timeout")), 45000)
+      );
+
+      // Race between PDF generation and timeout
+      pdfBuffer = await Promise.race([pdfPromise, timeoutPromise]);
+      console.log("✅ PDF generated successfully");
+    } catch (pdfError) {
+      console.error("❌ PDF generation failed:", pdfError);
+      // Continue without PDF - we'll send email without attachment
+      pdfBuffer = null;
+    }
+
     console.log("📧 Sending donation thank you email...");
 
-    // Send email WITHOUT PDF for now (to avoid Puppeteer issues)
+    // Send email with or without PDF
     const mailOptions = {
       from: "Rex Vets <support@rexvets.com>",
       to: email,
@@ -1519,15 +1689,21 @@ app.post("/sendDonationThankYou", async (req, res) => {
         donationDate,
         paymentMethod
       ),
-      // Temporarily removed PDF attachment to avoid server crashes
-      // attachments: [
-      //   {
-      //     filename: "Donation_Receipt.pdf",
-      //     content: pdfBuffer,
-      //     contentType: "application/pdf",
-      //   },
-      // ],
     };
+
+    // Add PDF attachment if generation was successful
+    if (pdfBuffer) {
+      mailOptions.attachments = [
+        {
+          filename: "Donation_Receipt.pdf",
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ];
+      console.log("📎 PDF attachment added to email");
+    } else {
+      console.log("📧 Sending email without PDF attachment");
+    }
 
     // Send email with Promise
     await new Promise((resolve, reject) => {
@@ -1542,15 +1718,32 @@ app.post("/sendDonationThankYou", async (req, res) => {
       });
     });
 
+    const successMessage = pdfBuffer
+      ? "Donation thank you email with receipt sent successfully!"
+      : "Donation thank you email sent successfully! PDF receipt will be sent separately.";
+
     res.status(200).json({
       success: true,
-      message:
-        "Donation thank you email sent successfully! PDF receipt will be sent separately.",
+      message: successMessage,
+      pdfGenerated: !!pdfBuffer,
     });
 
     console.log("✅ Donation email sent successfully to:", email);
   } catch (error) {
     console.error("❌ Error processing donation email:", error);
+
+    // Send error notification to user
+    try {
+      await transporter.sendMail({
+        from: "Rex Vets <support@rexvets.com>",
+        to: email,
+        subject: "About Your Donation Receipt - Rex Vets",
+        html: `<p>Dear ${name},</p><p>We encountered an issue generating your receipt. Our team has been notified and will send it to you shortly.</p><p>Thank you for your patience!</p>`,
+      });
+      console.log("📧 Error notification sent to user");
+    } catch (emailError) {
+      console.error("❌ Failed to send error notification:", emailError);
+    }
 
     res.status(500).json({
       success: false,
@@ -1621,6 +1814,47 @@ app.post("/test-donation", (req, res) => {
       success: false,
       error: error.message,
       timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Test endpoint for PDF generation
+app.post("/test-pdf", async (req, res) => {
+  console.log("🧪 Test PDF generation endpoint called");
+
+  try {
+    const testData = {
+      donorName: "Test User",
+      amount: "25.00",
+      receiptNumber: "TEST_123",
+      isRecurring: false,
+      badgeName: "Champion",
+      date: "2025-07-01",
+      paymentMethod: "Credit Card",
+    };
+
+    console.log("🔄 Starting test PDF generation...");
+    const pdfBuffer = await generateInvoicePDFPuppeteer(testData);
+
+    console.log(
+      "✅ Test PDF generated successfully, size:",
+      pdfBuffer.length,
+      "bytes"
+    );
+
+    // Return PDF as response for testing
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="test-receipt.pdf"'
+    );
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("❌ Test PDF generation failed:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 });
