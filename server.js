@@ -38,10 +38,41 @@ console.log(`- SMTP Host: ${process.env.SMTP_HOST || "Not configured"}`);
 
 // Configure CORS based on environment
 const corsOptions = {
-  origin: process.env.ALLOWED_ORIGIN || "https://www.rexvets.com",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      process.env.ALLOWED_ORIGIN || "https://www.rexvets.com",
+      "https://www.rexvets.com",
+      "https://rexvets.com",
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:5173",
+    ];
+
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log(`❌ CORS blocked origin: ${origin}`);
+      console.log(`✅ Allowed origins: ${allowedOrigins.join(", ")}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+  allowedHeaders: [
+    "Origin",
+    "X-Requested-With",
+    "Content-Type",
+    "Accept",
+    "Authorization",
+    "Cache-Control",
+    "X-Access-Token",
+  ],
   credentials: true,
+  optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
+  preflightContinue: false,
 };
 
 // Error handling middleware
@@ -67,6 +98,25 @@ app.use((req, res, next) => {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Handle preflight requests for all routes
+app.options("*", cors(corsOptions));
+
+// Request logging middleware for debugging
+app.use((req, res, next) => {
+  console.log(
+    `🔍 ${req.method} ${req.path} from origin: ${
+      req.headers.origin || "no-origin"
+    }`
+  );
+  console.log(`🔍 Headers:`, {
+    "content-type": req.headers["content-type"],
+    "user-agent": req.headers["user-agent"]?.substring(0, 50) + "...",
+    origin: req.headers.origin,
+    referer: req.headers.referer,
+  });
+  next();
+});
 
 // Global error handlers to prevent function crashes
 process.on("unhandledRejection", (reason, promise) => {
@@ -337,6 +387,26 @@ app.get(["/", "/health"], (req, res) => {
       error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
+});
+
+// CORS test endpoint
+app.get("/test-cors", (req, res) => {
+  res.json({
+    message: "CORS test successful",
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString(),
+    method: req.method,
+  });
+});
+
+app.post("/test-cors", (req, res) => {
+  res.json({
+    message: "CORS POST test successful",
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    body: req.body,
+  });
 });
 
 app.post("/sendWelcomeEmailParent", (req, res) => {
