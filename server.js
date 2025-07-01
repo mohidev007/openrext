@@ -915,6 +915,9 @@ app.post(
 
 // UPDATED Function to send 10-minute reminder emails with proper timezone handling
 async function sendReminderEmails(reminderData) {
+  console.log("📧 Starting to send 10-minute reminder emails...");
+  console.log("📋 Reminder data:", JSON.stringify(reminderData, null, 2));
+
   const {
     appointmentDate,
     appointmentTime,
@@ -929,7 +932,7 @@ async function sendReminderEmails(reminderData) {
     meetingLink,
   } = reminderData;
 
-  console.log("📧 Starting to send 10-minute reminder emails...");
+  console.log("⏰ Timezones - Doctor:", doctorTimezone, "User:", userTimezone);
 
   // Format times for each recipient's timezone
   const doctorTimeDisplay = formatTimeForTimezone(
@@ -1326,34 +1329,53 @@ app.get("/api/cron/process-reminders", requireFirebase, async (req, res) => {
       let shouldSend = false;
       let appointmentUTC;
 
+      console.log(`\n📝 Processing reminder ${doc.id}:`, {
+        email: reminderData.parentEmail,
+        date: reminderData.appointmentDate,
+        time: reminderData.appointmentTime,
+        timeUTC: reminderData.appointmentTimeUTC,
+        doctorTZ: reminderData.doctorTimezone,
+        userTZ: reminderData.userTimezone,
+      });
+
       // Use AppointmentTimeUTC if available (new format)
       if (reminderData.appointmentTimeUTC) {
         appointmentUTC = moment.utc(reminderData.appointmentTimeUTC);
+        console.log("Using UTC timestamp:", appointmentUTC.format());
       } else {
-        // Fallback to old format - assume doctor's timezone or EST
+        // Fallback to old format - use doctor's timezone or EST
         const timezone = reminderData.doctorTimezone || "America/New_York";
+        const localDateTime = `${reminderData.appointmentDate} ${reminderData.appointmentTime}`;
         appointmentUTC = moment
-          .tz(
-            `${reminderData.appointmentDate} ${reminderData.appointmentTime}`,
-            "YYYY-MM-DD h:mm A",
-            timezone
-          )
+          .tz(localDateTime, "YYYY-MM-DD h:mm A", timezone)
           .utc();
+        console.log(
+          `Converting local time (${localDateTime} ${timezone}) to UTC:`,
+          appointmentUTC.format()
+        );
       }
 
-      // Send reminder 10 minutes before appointment
+      // Send reminder 10 minutes before appointment with a 5-minute buffer
       const reminderTimeUTC = appointmentUTC.clone().subtract(10, "minutes");
-      shouldSend = now.isAfter(reminderTimeUTC) && now.isBefore(appointmentUTC);
+      const bufferTimeUTC = reminderTimeUTC.clone().subtract(5, "minutes");
 
-      console.log(
-        `📅 Processing reminder for ${
-          reminderData.parentEmail
-        }: appointment at ${appointmentUTC.format(
-          "YYYY-MM-DD HH:mm:ss"
-        )} UTC, reminder time: ${reminderTimeUTC.format(
-          "YYYY-MM-DD HH:mm:ss"
-        )} UTC, should send: ${shouldSend}`
-      );
+      // Only send if:
+      // 1. Current time is after buffer time (15 min before appointment)
+      // 2. Current time is before appointment time
+      // 3. Reminder hasn't been sent yet (checked by the query)
+      shouldSend =
+        now.isSameOrAfter(bufferTimeUTC) &&
+        now.isBefore(appointmentUTC) &&
+        !reminderData.reminderSent;
+
+      console.log("Time checks:", {
+        currentUTC: now.format(),
+        appointmentUTC: appointmentUTC.format(),
+        reminderTimeUTC: reminderTimeUTC.format(),
+        bufferTimeUTC: bufferTimeUTC.format(),
+        shouldSend,
+        reminderSent: reminderData.reminderSent,
+      });
 
       if (shouldSend) {
         console.log(
@@ -1384,14 +1406,15 @@ app.get("/api/cron/process-reminders", requireFirebase, async (req, res) => {
             lastAttempt: admin.firestore.FieldValue.serverTimestamp(),
           });
         }
+      } else {
+        console.log("⏳ Not time to send reminder yet");
       }
     }
 
     console.log(
       `✅ Cron job completed: Processed ${processedCount} reminders, sent ${sentCount} emails`
     );
-
-    const response = {
+    res.json({
       success: true,
       message: `Processed ${processedCount} reminders, sent ${sentCount} emails`,
       processedCount,
@@ -1399,18 +1422,14 @@ app.get("/api/cron/process-reminders", requireFirebase, async (req, res) => {
       timestamp: now.toISOString(),
       serverTime: now.format("YYYY-MM-DD HH:mm:ss") + " UTC",
       platform: "Railway",
-    };
-
-    res.json(response);
+    });
   } catch (error) {
     console.error("❌ Error in cron job:", error);
-    const errorResponse = {
+    res.status(500).json({
       success: false,
       error: error.message,
       timestamp: new Date().toISOString(),
-      platform: "Railway",
-    };
-    res.status(500).json(errorResponse);
+    });
   }
 });
 
@@ -1530,7 +1549,8 @@ app.get("/api/debug/reminders", requireFirebase, async (req, res) => {
   console.log("🔍 Debug: Checking pending reminders...");
 
   try {
-    const now = moment().tz(TIMEZONE);
+    const now = moment.utc();
+    console.log(`⏰ Current UTC time: ${now.format()}`);
 
     // Get all reminders
     const allRemindersSnapshot = await db
@@ -1543,34 +1563,61 @@ app.get("/api/debug/reminders", requireFirebase, async (req, res) => {
 
     allRemindersSnapshot.forEach((doc) => {
       const data = doc.data();
-      const appointmentMoment = moment.tz(
-        `${data.appointmentDate} ${data.appointmentTime}`,
-        "YYYY-MM-DD h:mm A",
-        TIMEZONE
-      );
+      let appointmentUTC;
 
-      let reminderTime;
-      reminderTime = appointmentMoment.clone().subtract(10, "minutes");
+      // Use AppointmentTimeUTC if available (new format)
+      if (data.appointmentTimeUTC) {
+        appointmentUTC = moment.utc(data.appointmentTimeUTC);
+      } else {
+        // Fallback to old format - use doctor's timezone or EST
+        const timezone = data.doctorTimezone || "America/New_York";
+        appointmentUTC = moment
+          .tz(
+            `${data.appointmentDate} ${data.appointmentTime}`,
+            "YYYY-MM-DD h:mm A",
+            timezone
+          )
+          .utc();
+      }
+
+      const reminderTimeUTC = appointmentUTC.clone().subtract(10, "minutes");
+      const bufferTimeUTC = reminderTimeUTC.clone().subtract(5, "minutes");
+
+      const shouldSendNow =
+        now.isSameOrAfter(bufferTimeUTC) &&
+        now.isBefore(appointmentUTC) &&
+        !data.reminderSent;
 
       reminders.push({
         id: doc.id,
         parentEmail: data.parentEmail,
         appointmentDate: data.appointmentDate,
         appointmentTime: data.appointmentTime,
+        appointmentTimeUTC: appointmentUTC.format(),
+        reminderTimeUTC: reminderTimeUTC.format(),
+        bufferTimeUTC: bufferTimeUTC.format(),
         reminderSent: data.reminderSent,
         scheduledAt: data.scheduledAt,
-        reminderTime: reminderTime.format("YYYY-MM-DD h:mm A"),
-        shouldSendNow: now.isAfter(reminderTime),
-        timeUntilReminder: reminderTime.diff(now, "minutes"),
+        shouldSendNow,
+        timeUntilReminder: reminderTimeUTC.diff(now, "minutes"),
+        timeUntilAppointment: appointmentUTC.diff(now, "minutes"),
+        doctorTimezone: data.doctorTimezone,
+        userTimezone: data.userTimezone,
       });
     });
 
     res.json({
       success: true,
-      currentTime: now.format("YYYY-MM-DD h:mm A"),
-      timezone: TIMEZONE,
+      currentTimeUTC: now.format(),
+      timezone: "UTC",
       totalReminders: reminders.length,
-      reminders,
+      reminders: reminders.sort((a, b) => {
+        // Sort by shouldSendNow (true first) then by timeUntilReminder
+        if (a.shouldSendNow !== b.shouldSendNow) {
+          return a.shouldSendNow ? -1 : 1;
+        }
+        return a.timeUntilReminder - b.timeUntilReminder;
+      }),
     });
   } catch (error) {
     console.error("❌ Error in debug endpoint:", error);
