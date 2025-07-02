@@ -310,7 +310,7 @@ async function generateInvoicePDFPuppeteer({
       ],
       defaultViewport: {
         width: 800,
-        height: 1200,
+        height: 1400,
         deviceScaleFactor: 1,
       },
       executablePath: await chromium.executablePath(),
@@ -340,6 +340,8 @@ async function generateInvoicePDFPuppeteer({
       printBackground: true,
       margin: { top: 10, right: 10, bottom: 10, left: 10 },
       timeout: 20000,
+      height: "1400px", // Increased height to fit content
+      width: "800px", // Matching the viewport width
     });
     console.log("✅ PDF generated successfully");
 
@@ -381,21 +383,22 @@ function createDonationReceiptHTML({
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
 <style>
-  body { margin: 0; padding: 20px; font-family: Arial, sans-serif; background-color: #f5f5f5; }
-  .invoice-container { max-width: 700px; margin: 0 auto; background: #ffffff; color: #333; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
-  .header { background-color: #002366; padding: 10px; text-align: center; }
-  .logo { width: 150px; height: auto; display: block; margin: 0 auto; }
-  .body { padding: 10px 30px; }
-  .title { color: #1e3a8a; font-size: 24px; margin: 20px 0 10px 0; }
-  .receipt-section { margin: 30px 0; border: 1px solid #d1d5db; border-radius: 8px; padding: 20px; background-color: #f9fafb; }
-  .receipt-title { margin-top: 0; color: #2563eb; font-size: 18px; }
+  body { margin: 0; padding: 15px; font-family: Arial, sans-serif; background-color: #f5f5f5; }
+  .invoice-container { max-width: 750px; margin: 0 auto; background: #ffffff; color: #333; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
+  .header { background-color: #002366; padding: 8px; text-align: center; }
+  .logo { width: 140px; height: auto; display: block; margin: 0 auto; }
+  .body { padding: 8px 25px; }
+  .title { color: #1e3a8a; font-size: 22px; margin: 15px 0 8px 0; }
+  .receipt-section { margin: 20px 0; border: 1px solid #d1d5db; border-radius: 8px; padding: 15px; background-color: #f9fafb; }
+  .receipt-title { margin-top: 0; color: #2563eb; font-size: 18px; margin-bottom: 12px; }
   .amount { color: #16a34a; font-weight: bold; }
-  .impact-title { color: #1e3a8a; margin-top: 30px; }
-  .impact-list { padding-left: 20px; color: #374151; }
-  .footer { background: rgb(200, 206, 219); padding: 15px; font-size: 13px; color: rgb(38, 79, 160); text-align: center; }
-  .footer p { margin: 4px 0; }
+  .impact-title { color: #1e3a8a; margin-top: 20px; margin-bottom: 10px; }
+  .impact-list { padding-left: 20px; color: #374151; margin: 10px 0; }
+  .impact-list li { margin-bottom: 8px; }
+  .footer { background: rgb(200, 206, 219); padding: 12px; font-size: 12px; color: rgb(38, 79, 160); text-align: center; margin-top: 15px; }
+  .footer p { margin: 3px 0; }
   .footer a { color: rgb(16, 45, 143); }
-  p { line-height: 1.5; }
+  p { line-height: 1.4; margin: 8px 0; }
   strong { font-weight: bold; }
 </style></head>
 <body>
