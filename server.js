@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import cors from "cors";
 import dotenv from "dotenv";
 import moment from "moment-timezone";
+import cron from "node-cron";
 import {
   welcomeEmailTemplate,
   bookingConfirmationDoctorTemplate,
@@ -1286,11 +1287,149 @@ const server = app
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
     console.log(`🔒 CORS origin: ${corsOptions.origin}`);
+
+    // Start internal cron scheduler for reminder emails
+    startInternalCronScheduler();
   })
   .on("error", (error) => {
     console.error("❌ Failed to start server:", error);
     process.exit(1);
   });
+
+// Internal cron scheduler function
+function startInternalCronScheduler() {
+  console.log("🕒 Starting internal cron scheduler...");
+
+  // Schedule reminder processing every 2 minutes
+  cron.schedule(
+    "*/2 * * * *",
+    async () => {
+      console.log("🔄 Internal cron: Processing reminder emails...");
+      try {
+        // Call the same logic as the HTTP endpoint
+        const response = await processRemindersInternal();
+        console.log("✅ Internal cron completed:", response);
+      } catch (error) {
+        console.error("❌ Internal cron error:", error);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
+    }
+  );
+
+  // Health check every 5 minutes
+  cron.schedule(
+    "*/5 * * * *",
+    () => {
+      console.log(`💓 Internal heartbeat: ${new Date().toISOString()}`);
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
+    }
+  );
+
+  console.log("✅ Internal cron scheduler started successfully");
+}
+
+// Internal function to process reminders (same logic as HTTP endpoint)
+async function processRemindersInternal() {
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const now = moment.utc();
+  console.log(
+    `⏰ Internal cron - Current UTC time: ${now.format(
+      "YYYY-MM-DD HH:mm:ss"
+    )} UTC`
+  );
+
+  // Query for unsent reminders
+  const remindersSnapshot = await db
+    .collection("ReminderEmails")
+    .where("reminderSent", "==", false)
+    .get();
+
+  console.log(
+    `📧 Internal cron - Found ${remindersSnapshot.size} pending reminders`
+  );
+
+  let processedCount = 0;
+  let sentCount = 0;
+
+  for (const doc of remindersSnapshot.docs) {
+    const reminderData = doc.data();
+    processedCount++;
+
+    let shouldSend = false;
+    let appointmentUTC;
+
+    // Use AppointmentTimeUTC if available (new format)
+    if (reminderData.appointmentTimeUTC) {
+      appointmentUTC = moment.utc(reminderData.appointmentTimeUTC);
+    } else {
+      // Fallback to old format - use doctor's timezone or EST
+      const timezone = reminderData.doctorTimezone || "America/New_York";
+      const localDateTime = `${reminderData.appointmentDate} ${reminderData.appointmentTime}`;
+      appointmentUTC = moment
+        .tz(localDateTime, "YYYY-MM-DD h:mm A", timezone)
+        .utc();
+    }
+
+    // Send reminder 10 minutes before appointment with a 5-minute buffer
+    const reminderTimeUTC = appointmentUTC.clone().subtract(10, "minutes");
+    const bufferTimeUTC = reminderTimeUTC.clone().subtract(5, "minutes");
+
+    shouldSend =
+      now.isSameOrAfter(bufferTimeUTC) &&
+      now.isBefore(appointmentUTC) &&
+      !reminderData.reminderSent;
+
+    if (shouldSend) {
+      console.log(
+        `✅ Internal cron - Sending reminder to ${reminderData.parentEmail}...`
+      );
+
+      try {
+        await sendReminderEmails(reminderData);
+
+        // Mark as sent
+        await doc.ref.update({
+          reminderSent: true,
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+          sentVia: "internal-cron",
+        });
+
+        sentCount++;
+        console.log(
+          `🎉 Internal cron - Reminder sent successfully to ${reminderData.parentEmail}`
+        );
+      } catch (emailError) {
+        console.error(`❌ Internal cron - Error sending reminder:`, emailError);
+        await doc.ref.update({
+          reminderSent: false,
+          lastError: emailError.message,
+          lastAttempt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    }
+  }
+
+  const result = {
+    processedCount,
+    sentCount,
+    timestamp: now.toISOString(),
+    source: "internal-cron",
+  };
+
+  console.log(
+    `✅ Internal cron completed: Processed ${processedCount} reminders, sent ${sentCount} emails`
+  );
+  return result;
+}
 
 // Handle graceful shutdown
 process.on("SIGTERM", () => {
@@ -1923,6 +2062,44 @@ app.get("/test-email", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   }
+});
+
+// Test endpoint to manually trigger internal cron
+app.post("/api/test/internal-cron", requireFirebase, async (req, res) => {
+  console.log("🧪 Test: Manually triggering internal cron...");
+
+  try {
+    const result = await processRemindersInternal();
+    res.json({
+      success: true,
+      message: "Internal cron executed successfully",
+      result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error in internal cron test:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Debug endpoint to check if cron is running
+app.get("/api/debug/cron-status", (req, res) => {
+  const now = moment.utc();
+  res.json({
+    status: "active",
+    currentTime: now.format("YYYY-MM-DD HH:mm:ss") + " UTC",
+    platform: "Railway",
+    cronScheduler: "node-cron (internal)",
+    uptime: process.uptime(),
+    serverRunning: true,
+    message: "Internal cron scheduler is active",
+    nodeVersion: process.version,
+    timestamp: now.toISOString(),
+  });
 });
 
 // Test endpoint to create a test appointment
