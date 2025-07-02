@@ -36,7 +36,23 @@ export const emailController = {
         userTimezone,
         userDisplayTime,
         meetingLink,
+        amount,
+        transactionID,
+        IsRecurring,
+        badgeName,
+        paymentMethod,
       } = req.body;
+
+      // Generate the invoice PDF with dynamic values
+      const pdfBuffer = await generateInvoicePDFPuppeteer({
+        donorName: parentName,
+        amount: amount || "0.00",
+        receiptNumber: transactionID || `BK-${Date.now()}`,
+        isRecurring: IsRecurring || false,
+        badgeName: badgeName || "",
+        date: appointmentDate || new Date().toLocaleDateString(),
+        paymentMethod: paymentMethod || "Unknown",
+      });
 
       await emailService.sendBookingConfirmation({
         doctorEmail,
@@ -51,6 +67,7 @@ export const emailController = {
         userTimezone,
         userDisplayTime,
         meetingLink,
+        pdfAttachment: pdfBuffer,
       });
 
       res.send({ message: "Booking confirmation emails sent successfully!" });

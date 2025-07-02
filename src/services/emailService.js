@@ -43,6 +43,7 @@ export const emailService = {
     userTimezone,
     userDisplayTime,
     meetingLink,
+    pdfAttachment,
   }) {
     const doctorTimeDisplay = formatTimeForTimezone(
       appointmentTimeUTC,
@@ -58,6 +59,16 @@ export const emailService = {
       appointmentDate
     );
 
+    const attachments = pdfAttachment
+      ? [
+          {
+            filename: "Donation-Receipt-RexVets.pdf",
+            content: pdfAttachment,
+            contentType: "application/pdf",
+          },
+        ]
+      : [];
+
     const mailOptionsDoctor = {
       from: "Rex Vets <support@rexvets.com>",
       to: doctorEmail,
@@ -69,6 +80,7 @@ export const emailService = {
         petName,
         meetingLink
       ),
+      attachments,
     };
 
     const mailOptionsParent = {
@@ -82,6 +94,7 @@ export const emailService = {
         petName,
         meetingLink
       ),
+      attachments,
     };
 
     await Promise.all([

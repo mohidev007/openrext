@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import nodemailer from "nodemailer";
 
 export const createTransporter = () => {
@@ -8,7 +11,7 @@ export const createTransporter = () => {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASSWORD,
     },
-    debug: true,
-    logger: true,
+    debug: false,
+    logger: false,
   });
 };

@@ -33,7 +33,7 @@ export const bookingConfirmationDoctorTemplate = (
           
             <div style="text-align: center; margin: 20px 0;">
                 <a href="${meetingLink}" style="background-color: #002366; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-                    Join Appointment Now
+                    Appointment Link
                 </a>
             </div>
             <p style="text-align: center; word-break: break-all; color: #666;">

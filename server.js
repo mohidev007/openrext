@@ -1,6 +1,8 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import moment from "moment-timezone";
 
 // Import configurations
@@ -23,21 +25,9 @@ import { generateInvoicePDFPuppeteer } from "./src/services/pdfService.js";
 // Import controllers
 import { emailController } from "./src/controllers/emailController.js";
 
-dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Log startup environment
-console.log("🔧 Starting Rex Vets Email Server:");
-console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
-console.log(`- PORT: ${PORT}`);
-console.log(
-  `- Firebase Project: ${process.env.FIREBASE_PROJECT_ID || "Not configured"}`
-);
-console.log(`- SMTP Host: ${process.env.SMTP_HOST || "Not configured"}`);
-
-// Initialize Firebase
 try {
   initializeFirebase();
 } catch (error) {
@@ -149,7 +139,7 @@ app.get("/api/cron/process-reminders", requireFirebase, async (req, res) => {
   try {
     console.log("🔄 Cron job triggered: Processing reminder emails...");
     const result = await reminderService.processReminders();
-
+    console.log("result------", result);
     console.log(
       `✅ Cron job completed: Processed ${result.processedCount} reminders, sent ${result.sentCount} emails`
     );
@@ -212,28 +202,28 @@ app.get("/api/cron/status", requireFirebase, async (req, res) => {
 });
 
 // Debug endpoints
-app.get("/api/debug/reminders", requireFirebase, async (req, res) => {
-  try {
-    const reminders = await reminderService.getReminders(20);
-    res.json({
-      success: true,
-      currentTimeUTC: moment.utc().format(),
-      timezone: "UTC",
-      totalReminders: reminders.length,
-      reminders,
-    });
-  } catch (error) {
-    console.error("❌ Error in debug endpoint:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
+// app.get("/api/debug/reminders", requireFirebase, async (req, res) => {
+//   try {
+//     const reminders = await reminderService.getReminders(20);
+//     res.json({
+//       success: true,
+//       currentTimeUTC: moment.utc().format(),
+//       timezone: "UTC",
+//       totalReminders: reminders.length,
+//       reminders,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error in debug endpoint:", error);
+//     res.status(500).json({
+//       success: false,
+//       error: error.message,
+//     });
+//   }
+// });
 
-app.get("/api/debug/cron-status", (req, res) => {
-  res.json(cronService.getStatus());
-});
+// app.get("/api/debug/cron-status", (req, res) => {
+//   res.json(cronService.getStatus());
+// });
 
 // Test endpoints
 app.post("/api/test/trigger-reminder", requireFirebase, async (req, res) => {

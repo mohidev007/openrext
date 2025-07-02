@@ -47,7 +47,7 @@ export async function generateInvoicePDFPuppeteer({
       ],
       defaultViewport: {
         width: 800,
-        height: 1400,
+        height: 1300,
         deviceScaleFactor: 1,
       },
       executablePath: await chromium.executablePath(),
@@ -73,12 +73,11 @@ export async function generateInvoicePDFPuppeteer({
     console.log("✅ Content set successfully");
 
     const pdfBuffer = await page.pdf({
-      format: "A4",
       printBackground: true,
-      margin: { top: 10, right: 10, bottom: 10, left: 10 },
+      margin: { top: 10, right: 20, bottom: 20, left: 20 },
       timeout: 20000,
-      height: "1400px", // Increased height to fit content
-      width: "800px", // Matching the viewport width
+      height: "1020px",
+      width: "700px",
     });
     console.log("✅ PDF generated successfully");
 
