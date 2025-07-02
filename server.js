@@ -159,6 +159,48 @@ app.get("/api/cron/process-reminders", requireFirebase, async (req, res) => {
     });
   }
 });
+app.post("/sendHelpAskingReply", async (req, res) => {
+  const { to, subject, message, originalTicket } = req.body;
+
+  if (!to || !message) {
+    return res.status(400).json({ error: "'to' and 'message' are required" });
+  }
+
+  // Optionally, build a more complete HTML email using originalTicket
+  const html = `
+    <div style="font-family: Arial, sans-serif;">
+      <h2>Admin Response from Rex Vets</h2>
+      <div style="margin-bottom: 20px;">
+        <strong>Your original request:</strong>
+        <div style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
+          <p><strong>Subject:</strong> ${originalTicket?.subject || "N/A"}</p>
+          <p>${originalTicket?.message || ""}</p>
+        </div>
+      </div>
+      <div style="margin-bottom: 20px;">
+        <strong>Our reply:</strong>
+        <div style="background: #e8f5e9; padding: 10px; border-radius: 5px;">
+          <p>${message}</p>
+        </div>
+      </div>
+      <p>Thank you for contacting Rex Vets Support.</p>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: "Rex Vets Support <support@rexvets.com>",
+      to,
+      subject:
+        subject || `Re: ${originalTicket?.subject || "Your Support Request"}`,
+      html,
+    });
+    res.json({ message: "Email sent!" });
+  } catch (error) {
+    console.error("Error sending admin reply:", error);
+    res.status(500).json({ error: "Failed to send email" });
+  }
+});
 
 app.get("/api/cron/status", requireFirebase, async (req, res) => {
   try {
