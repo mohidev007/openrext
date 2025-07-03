@@ -8,6 +8,7 @@ import moment from "moment-timezone";
 // Import configurations
 import { corsOptions } from "./src/config/cors.js";
 import { initializeFirebase } from "./src/config/database.js";
+import { createTransporter } from "./src/config/email.js";
 
 // Import middleware
 import {
@@ -34,6 +35,8 @@ try {
   console.error("❌ Firebase initialization failed:", error.message);
   console.error("Server will continue without Firebase functionality");
 }
+
+const transporter = createTransporter();
 
 // Global error handlers
 process.on("unhandledRejection", (reason, promise) => {
@@ -160,12 +163,12 @@ app.get("/api/cron/process-reminders", requireFirebase, async (req, res) => {
   }
 });
 app.post("/sendHelpAskingReply", async (req, res) => {
+  console.log("🔄 sendHelpAskingReply endpoint called");
   const { to, subject, message, originalTicket } = req.body;
 
   if (!to || !message) {
     return res.status(400).json({ error: "'to' and 'message' are required" });
   }
-
   // Optionally, build a more complete HTML email using originalTicket
   const html = `
     <div style="font-family: Arial, sans-serif;">

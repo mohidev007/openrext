@@ -201,6 +201,73 @@ export const emailService = {
     return await transporter.sendMail(mailOptions);
   },
 
+  async sendRescheduleConfirmation({
+    doctorEmail,
+    doctorName,
+    parentEmail,
+    parentName,
+    petName,
+    appointmentDate,
+    oldTime,
+    oldDate,
+    appointmentTime,
+    appointmentTimeUTC,
+    doctorTimezone,
+    userTimezone,
+    userDisplayTime,
+    userOldTime,
+    meetingLink,
+  }) {
+    const doctorTimeDisplay = formatTimeForTimezone(
+      appointmentTimeUTC,
+      doctorTimezone,
+      appointmentTime,
+      appointmentDate
+    );
+
+    const parentTimeDisplay = formatTimeForTimezone(
+      appointmentTimeUTC,
+      userTimezone,
+      userDisplayTime || appointmentTime,
+      appointmentDate
+    );
+
+    const mailOptionsDoctor = {
+      from: "Rex Vets <support@rexvets.com>",
+      to: doctorEmail,
+      subject: "Appointment Rescheduled - Rex Vets",
+      html: rescheduleConfirmationDoctorTemplate(
+        doctorName,
+        parentName,
+        doctorTimeDisplay,
+        petName,
+        meetingLink,
+        oldDate,
+        oldTime
+      ),
+    };
+
+    const mailOptionsParent = {
+      from: "Rex Vets <support@rexvets.com>",
+      to: parentEmail,
+      subject: "Your Appointment Rescheduled - Rex Vets",
+      html: rescheduleConfirmationParentTemplate(
+        parentName,
+        doctorName,
+        parentTimeDisplay,
+        petName,
+        meetingLink,
+        oldDate,
+        userOldTime
+      ),
+    };
+
+    await Promise.all([
+      transporter.sendMail(mailOptionsDoctor),
+      transporter.sendMail(mailOptionsParent),
+    ]);
+  },
+
   async sendPaymentEmail({
     to,
     name,
