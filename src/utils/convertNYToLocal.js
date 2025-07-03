@@ -1,22 +1,21 @@
-import { format } from "date-fns";
-import { DateTime } from "luxon";
+import moment from "moment-timezone";
 
 const convertNYToLocal = (time, date) => {
-  const formatted = format(date, "yyyy-MM-dd");
+  // Format the date using moment
+  const formatted = moment(date).format("YYYY-MM-DD");
 
-  const nyTime = DateTime.fromFormat(
+  // Create moment object for NY time
+  const nyTime = moment.tz(
     `${formatted} ${time}`,
-    "yyyy-MM-dd hh:mm a",
-    {
-      zone: "America/New_York",
-    }
+    "YYYY-MM-DD hh:mm A",
+    "America/New_York"
   );
 
-  const userTime = nyTime.setZone(
-    Intl.DateTimeFormat().resolvedOptions().timeZone
-  );
+  // Convert to user's local timezone
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const userTime = nyTime.clone().tz(userTimezone);
 
-  return userTime.toFormat("hh:mm a");
+  return userTime.format("hh:mm A");
 };
 
 export default convertNYToLocal;

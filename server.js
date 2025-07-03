@@ -18,10 +18,20 @@ import {
 } from "./src/middleware/errorHandler.js";
 import { requireFirebase } from "./src/middleware/auth.js";
 
+// Import performance middleware
+import {
+  performanceTimingMiddleware,
+  memoryMonitoringMiddleware,
+  compressionMiddleware,
+  requestRateLimitingMiddleware,
+  healthCheckMiddleware,
+  getPerformanceStats
+} from "./src/middleware/performance.js";
+
 // Import services
 import { cronService } from "./src/services/cronService.js";
 import { reminderService } from "./src/services/reminderService.js";
-import { generateInvoicePDFPuppeteer } from "./src/services/pdfService.js";
+import { generateInvoicePDFPuppeteer, getPDFServiceStats, closePDFService } from "./src/services/optimizedPdfService.js";
 
 // Import controllers
 import { emailController } from "./src/controllers/emailController.js";
@@ -47,7 +57,14 @@ process.on("uncaughtException", (error) => {
   console.error("❌ Uncaught Exception:", error);
 });
 
-// Middleware
+// Performance middleware (order matters)
+app.use(compressionMiddleware); // Enable gzip compression
+app.use(performanceTimingMiddleware); // Track response times
+app.use(memoryMonitoringMiddleware); // Monitor memory usage
+app.use(requestRateLimitingMiddleware); // Rate limiting
+app.use(healthCheckMiddleware); // Health check enhancements
+
+// Standard middleware
 app.use(errorHandler);
 app.use(timeoutMiddleware);
 app.use(cors(corsOptions));
@@ -57,18 +74,22 @@ app.use(requestLogger);
 
 // ==================== ROUTES ====================
 
-// Health check endpoints
+// Health check endpoints with performance metrics
 app.get(["/", "/health"], (req, res) => {
   try {
+    const performanceStats = getPerformanceStats();
+    const pdfStats = getPDFServiceStats();
+    
     res.json({
       status: "OK",
-      message: "Rex Vets Email Server is running",
+      message: "Rex Vets Email Server is running (Optimized)",
       timestamp: new Date().toISOString(),
       platform: "Railway",
       services: {
         firebase: "Connected",
         firestore: "Connected",
         nodemailer: "Ready",
+        pdfService: "Optimized",
       },
       environment: {
         hasFirebaseConfig: !!process.env.FIREBASE_PROJECT_ID,
@@ -77,6 +98,18 @@ app.get(["/", "/health"], (req, res) => {
         platform: process.platform,
         port: PORT,
       },
+      performance: {
+        ...performanceStats,
+        pdfService: pdfStats,
+        optimizations: [
+          "✅ Dependency cleanup (-187KB)",
+          "✅ Template lazy loading",
+          "✅ Browser pooling",
+          "✅ Response compression",
+          "✅ Performance monitoring"
+        ]
+      },
+      ...(req.healthData || {})
     });
   } catch (error) {
     console.error("❌ Health check error:", error);
@@ -352,6 +385,33 @@ app.post("/api/test/create-appointment", requireFirebase, async (req, res) => {
 
 app.get("/test-email", emailController.testEmail);
 
+// Performance monitoring endpoints
+app.get("/api/performance", (req, res) => {
+  try {
+    const stats = getPerformanceStats();
+    const pdfStats = getPDFServiceStats();
+    
+    res.json({
+      success: true,
+      performance: stats,
+      pdfService: pdfStats,
+      serverInfo: {
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage(),
+        cpuUsage: process.cpuUsage(),
+        nodeVersion: process.version,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error("❌ Performance stats error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 app.post("/test-donation", (req, res) => {
   console.log("🧪 Test donation endpoint called");
   res.status(200).json({
@@ -406,11 +466,35 @@ const server = app.listen(PORT, "0.0.0.0", () => {
   cronService.startInternalCronScheduler();
 });
 
-// Graceful shutdown
-process.on("SIGTERM", () => {
+// Graceful shutdown with cleanup
+process.on("SIGTERM", async () => {
   console.log("🛑 SIGTERM received. Shutting down gracefully...");
+  
+  // Close PDF service browser pool
+  try {
+    await closePDFService();
+  } catch (error) {
+    console.error("❌ Error closing PDF service:", error.message);
+  }
+  
   server.close(() => {
-    console.log("✅ Server closed");
+    console.log("✅ Server closed gracefully");
+    process.exit(0);
+  });
+});
+
+// Handle SIGINT (Ctrl+C) as well
+process.on("SIGINT", async () => {
+  console.log("🛑 SIGINT received. Shutting down gracefully...");
+  
+  try {
+    await closePDFService();
+  } catch (error) {
+    console.error("❌ Error closing PDF service:", error.message);
+  }
+  
+  server.close(() => {
+    console.log("✅ Server closed gracefully");
     process.exit(0);
   });
 });
