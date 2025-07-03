@@ -237,13 +237,14 @@ export const emailService = {
       to: doctorEmail,
       subject: "Appointment Rescheduled - Rex Vets",
       html: rescheduleConfirmationDoctorTemplate(
-        doctorName,
         parentName,
-        doctorTimeDisplay,
+        doctorName,
         petName,
-        meetingLink,
         oldDate,
-        oldTime
+        oldTime,
+        appointmentDate,
+        doctorTimeDisplay,
+        meetingLink
       ),
     };
 
@@ -254,11 +255,12 @@ export const emailService = {
       html: rescheduleConfirmationParentTemplate(
         parentName,
         doctorName,
-        parentTimeDisplay,
         petName,
-        meetingLink,
         oldDate,
-        userOldTime
+        userOldTime,
+        appointmentDate,
+        parentTimeDisplay,
+        meetingLink
       ),
     };
 

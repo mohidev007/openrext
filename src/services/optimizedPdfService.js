@@ -16,7 +16,9 @@ class BrowserPool {
     if (this.pool.length > 0) {
       const browser = this.pool.pop();
       this.totalReused++;
-      console.log(`♻️  Reusing browser from pool (reused: ${this.totalReused})`);
+      console.log(
+        `♻️  Reusing browser from pool (reused: ${this.totalReused})`
+      );
       return browser;
     }
 
@@ -24,7 +26,9 @@ class BrowserPool {
     const browser = await this.createBrowser();
     this.totalCreated++;
     this.activeCount++;
-    console.log(`🆕 Created new browser (total: ${this.totalCreated}, active: ${this.activeCount})`);
+    console.log(
+      `🆕 Created new browser (total: ${this.totalCreated}, active: ${this.activeCount})`
+    );
     return browser;
   }
 
@@ -46,7 +50,9 @@ class BrowserPool {
       // Return to pool if not full
       if (this.pool.length < this.maxSize) {
         this.pool.push(browser);
-        console.log(`🔄 Returned browser to pool (pool size: ${this.pool.length})`);
+        console.log(
+          `🔄 Returned browser to pool (pool size: ${this.pool.length})`
+        );
       } else {
         await browser.close();
         this.activeCount--;
@@ -98,8 +104,10 @@ class BrowserPool {
   }
 
   async closeAll() {
-    console.log(`🧹 Closing all browsers in pool (${this.pool.length} browsers)`);
-    const closePromises = this.pool.map(browser => browser.close());
+    console.log(
+      `🧹 Closing all browsers in pool (${this.pool.length} browsers)`
+    );
+    const closePromises = this.pool.map((browser) => browser.close());
     await Promise.all(closePromises);
     this.pool = [];
     this.activeCount = 0;
@@ -112,7 +120,10 @@ class BrowserPool {
       activeCount: this.activeCount,
       totalCreated: this.totalCreated,
       totalReused: this.totalReused,
-      reuseRate: this.totalCreated > 0 ? ((this.totalReused / this.totalCreated) * 100).toFixed(1) + '%' : '0%'
+      reuseRate:
+        this.totalCreated > 0
+          ? ((this.totalReused / this.totalCreated) * 100).toFixed(1) + "%"
+          : "0%",
     };
   }
 }
@@ -135,7 +146,7 @@ export async function generateInvoicePDFPuppeteer({
 
   try {
     console.log("🔄 Starting optimized PDF generation...");
-    
+
     // Get browser from pool
     browser = await browserPool.getBrowser();
     console.log("✅ Browser acquired from pool");
@@ -143,10 +154,10 @@ export async function generateInvoicePDFPuppeteer({
     // Create or reuse page
     const pages = await browser.pages();
     page = pages.length > 0 ? pages[0] : await browser.newPage();
-    
+
     // Clear any existing content
-    await page.goto('about:blank');
-    
+    await page.goto("about:blank");
+
     // Set timeout and configure page
     page.setDefaultTimeout(15000);
     page.setDefaultNavigationTimeout(15000);
@@ -164,7 +175,7 @@ export async function generateInvoicePDFPuppeteer({
 
     console.log("📄 Setting PDF content...");
     await page.setContent(html, {
-      waitUntil: ['load', 'networkidle0'],
+      waitUntil: ["load", "networkidle0"],
       timeout: 15000,
     });
 
@@ -173,7 +184,7 @@ export async function generateInvoicePDFPuppeteer({
       printBackground: true,
       margin: { top: 10, right: 20, bottom: 20, left: 20 },
       timeout: 15000,
-      height: "1020px",
+      height: "1050px",
       width: "700px",
       preferCSSPageSize: true,
     });
@@ -243,7 +254,11 @@ function createOptimizedDonationReceiptHTML({
         <p><strong>Receipt No:</strong> ${receiptNumber}</p>
         <p><strong>Date:</strong> ${date}</p>
         <p><strong>Donation Amount:</strong> <span class="amount">$${amount}</span></p>
-        ${badgeName ? `<p><strong>Badge:</strong> <strong>${badgeName}</strong></p>` : ''}
+        ${
+          badgeName
+            ? `<p><strong>Badge:</strong> <strong>${badgeName}</strong></p>`
+            : ""
+        }
         <p><strong>Payment Method:</strong> ${paymentMethod}</p>
         <h4>Tax Statement:</h4>
         <p style="margin:0">Rex Vets Inc is a 501(c)(3) non-profit organization. No goods or services were received in exchange for this gift. It may be considered tax-deductible to the full extent of the law. Please retain this receipt for your records.</p>
@@ -284,13 +299,13 @@ export async function checkPDFServiceHealth() {
   try {
     const stats = browserPool.getStats();
     return {
-      status: 'healthy',
+      status: "healthy",
       stats,
       memoryUsage: process.memoryUsage(),
     };
   } catch (error) {
     return {
-      status: 'unhealthy',
+      status: "unhealthy",
       error: error.message,
     };
   }

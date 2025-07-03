@@ -68,7 +68,7 @@ export const rescheduleConfirmationDoctorTemplate = (
             <img src="https://res.cloudinary.com/di6zff0rd/image/upload/v1748961858/emailtemp1_sv6jxx.jpg" alt="Top Banner" style="display: block; height: auto; border: 0; width: 100%;" />
           </div>
         
-          <p>Dear ${doctorName},</p>
+          <p>Dear Dr.-- ${doctorName},</p>
         
           <p>This is to notify you that your scheduled video call appointment with <strong>${parentName}</strong> at Rex Vets has been <strong>rescheduled</strong>. Please find the updated appointment details below:</p>
         
@@ -78,7 +78,7 @@ export const rescheduleConfirmationDoctorTemplate = (
               : ""
           }
         
-          <p><strong>New Start Time:</strong> ${appointmentDate} at ${appointmentTime}</p>
+          <p><strong>New Start Time:</strong> ${appointmentTime}</p>
           <p><strong>Veterinarian:</strong> ${doctorName}</p>
           <p><strong>Parent:</strong> ${parentName}</p>
           <p><strong>Pet Name:</strong> ${petName}</p>
@@ -123,8 +123,7 @@ export const bookingConfirmationParentTemplate = (
             
             <div style="text-align: center; margin: 20px 0;">
                 <a href="${meetingLink}" style="background-color: #002366; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-                    Join Appointment Now
-                </a>
+                    Appointment                </a>
             </div>
             <p style="text-align: center; word-break: break-all; color: #666;">
                 Or copy and paste this link in your browser:<br/> ${meetingLink}
@@ -168,7 +167,7 @@ export const rescheduleConfirmationParentTemplate = (
               : ""
           }
         
-          <p><strong>New Start Time:</strong> ${appointmentDate} at ${userDisplayTime}</p>
+          <p><strong>New Start Time:</strong> ${userDisplayTime}</p>
           <p><strong>Veterinarian:</strong> Dr. ${doctorName}</p>
           <p><strong>Pet Name:</strong> ${petName}</p>
         

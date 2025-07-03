@@ -25,13 +25,17 @@ import {
   compressionMiddleware,
   requestRateLimitingMiddleware,
   healthCheckMiddleware,
-  getPerformanceStats
+  getPerformanceStats,
 } from "./src/middleware/performance.js";
 
 // Import services
 import { cronService } from "./src/services/cronService.js";
 import { reminderService } from "./src/services/reminderService.js";
-import { generateInvoicePDFPuppeteer, getPDFServiceStats, closePDFService } from "./src/services/optimizedPdfService.js";
+import {
+  generateInvoicePDFPuppeteer,
+  getPDFServiceStats,
+  closePDFService,
+} from "./src/services/optimizedPdfService.js";
 
 // Import controllers
 import { emailController } from "./src/controllers/emailController.js";
@@ -79,7 +83,7 @@ app.get(["/", "/health"], (req, res) => {
   try {
     const performanceStats = getPerformanceStats();
     const pdfStats = getPDFServiceStats();
-    
+
     res.json({
       status: "OK",
       message: "Rex Vets Email Server is running (Optimized)",
@@ -106,10 +110,10 @@ app.get(["/", "/health"], (req, res) => {
           "✅ Template lazy loading",
           "✅ Browser pooling",
           "✅ Response compression",
-          "✅ Performance monitoring"
-        ]
+          "✅ Performance monitoring",
+        ],
       },
-      ...(req.healthData || {})
+      ...(req.healthData || {}),
     });
   } catch (error) {
     console.error("❌ Health check error:", error);
@@ -390,7 +394,7 @@ app.get("/api/performance", (req, res) => {
   try {
     const stats = getPerformanceStats();
     const pdfStats = getPDFServiceStats();
-    
+
     res.json({
       success: true,
       performance: stats,
@@ -400,14 +404,14 @@ app.get("/api/performance", (req, res) => {
         memoryUsage: process.memoryUsage(),
         cpuUsage: process.cpuUsage(),
         nodeVersion: process.version,
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     });
   } catch (error) {
     console.error("❌ Performance stats error:", error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -469,14 +473,14 @@ const server = app.listen(PORT, "0.0.0.0", () => {
 // Graceful shutdown with cleanup
 process.on("SIGTERM", async () => {
   console.log("🛑 SIGTERM received. Shutting down gracefully...");
-  
+
   // Close PDF service browser pool
   try {
     await closePDFService();
   } catch (error) {
     console.error("❌ Error closing PDF service:", error.message);
   }
-  
+
   server.close(() => {
     console.log("✅ Server closed gracefully");
     process.exit(0);
@@ -486,13 +490,13 @@ process.on("SIGTERM", async () => {
 // Handle SIGINT (Ctrl+C) as well
 process.on("SIGINT", async () => {
   console.log("🛑 SIGINT received. Shutting down gracefully...");
-  
+
   try {
     await closePDFService();
   } catch (error) {
     console.error("❌ Error closing PDF service:", error.message);
   }
-  
+
   server.close(() => {
     console.log("✅ Server closed gracefully");
     process.exit(0);

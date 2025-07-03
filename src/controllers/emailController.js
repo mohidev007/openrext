@@ -1,6 +1,6 @@
 import { emailService } from "../services/emailService.js";
 import { reminderService } from "../services/reminderService.js";
-import { generateInvoicePDFPuppeteer } from "../services/pdfService.js";
+import { generateInvoicePDFPuppeteer } from "../services/optimizedPdfService.js";
 import { admin } from "../config/database.js";
 import convertNYToLocal from "../utils/convertNYToLocal.js";
 
@@ -110,7 +110,6 @@ export const emailController = {
         "📩 Received request to send reschedule confirmation:",
         req.body
       );
-
       const {
         doctorEmail,
         doctorName,
@@ -128,6 +127,7 @@ export const emailController = {
         meetingLink,
       } = req.body;
 
+      console.log("Req body reschedule confirmation", req.body);
       const userOldTime = convertNYToLocal(oldTime, oldDate);
 
       await emailService.sendRescheduleConfirmation({
